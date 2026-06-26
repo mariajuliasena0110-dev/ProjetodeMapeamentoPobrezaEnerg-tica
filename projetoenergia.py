@@ -1,47 +1,47 @@
-import pandas as pd 
-from sklearn.model_selection import train_test_split
-from skleran.ensemble import RandomForecastClassifier
-from sklearn.metrica import classification_report
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
 
-ddef main (){
-    print ("MODELO PREDITIVO: RISCO DE POBREZA ENERGÉTICA\n")
-    
-    nome_arquivo = 'dataset_pobreza_energetica(2).csv'
+print("[1/4] Carregando e preparando os dados da tabela...")
+df = pd.read_csv('dataset_pobreza_energetica(2).csv')
 
-    try:
-        df = pd.read_cvs(nome_arquivo)
-        print (f"[OK] Dados carregados com sucesso! Total de domicílios analisados: {len(df)}")
-        print (f"[ERRO] Não encontei o arquvio '{nome_arquivo}'.")
-        return
+# Agrupa o risco por região
+risco_por_regiao = df.groupby('regiao_administrativa')['risco_pobreza_energetica'].sum().reset_index()
 
-        y = df ['risco_pobreza_energetica']
+# Padroniza os nomes para MAIÚSCULAS para bater exatamente com o mapa do governo
+risco_por_regiao['regiao_administrativa'] = risco_por_regiao['regiao_administrativa'].str.upper()
 
-        features = ['renda_per_capita_rs', 'num_moradores', 'num_comodos', 'acesso_rede_oficial', 'percentual_gasto_energia', 'inscrito_cadunico']
+print("[2/4] Carregando o mapa do Distrito Federal...")
+# Aponta para o novo arquivo que você baixou
+caminho_shp = 'mapa_df/regioes_administrativas.shp' 
+mapa = gpd.read_file(caminho_shp)
 
-        X = df [festure]
+print("[3/4] Cruzando os dados de pobreza com a cartografia...")
+# O merge liga o 'ra_nome' do mapa com a 'regiao_administrativa' da nossa tabela
+mapa_dados = mapa.merge(risco_por_regiao, 
+                        left_on='ra_nome', 
+                        right_on='regiao_administrativa', 
+                        how='left')
 
-        X = pd.concat([X, pd.get_dummies(df['regiao_administrativa'], prefix='regiao')], axis=1)
+print("[4/4] Desenhando o mapa de vulnerabilidade...")
+fig, ax = plt.subplots(1, 1, figsize=(14, 10))
 
+# Plota o mapa. Regiões sem dados na tabela ficarão em cinza claro.
+mapa_dados.plot(column='risco_pobreza_energetica', 
+                ax=ax, 
+                legend=True,
+                cmap='OrRd', # Paleta Laranja-Vermelho
+                edgecolor='black',
+                linewidth=0.5,
+                missing_kwds={'color': '#e0e0e0'})
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
+plt.title('Risco de Pobreza Energética por Região Administrativa (DF)', fontsize=16, fontweight='bold')
+plt.axis('off') # Esconde as linhas de latitude/longitude
+plt.tight_layout()
 
-    
-        print("[...] Treinando o modelo de Machine Learning...")
-        modelo = RandomForestClassifier(n_estimators=100, random_state=42)
-        modelo.fit(X_train, y_train)
+# Salva a imagem em alta resolução
+plt.savefig('mapa_vulnerabilidade_df.png', dpi=300, bbox_inches='tight')
+print("\n🎉 Sucesso! O mapa foi gerado e salvo como 'mapa_vulnerabilidade_df.png'.")
 
-        previsoes = modelo.predict(X_test)
-    
-        print("\n--- Relatório de Desempenho da IA ---")
-        print(classification_report(y_test, previsoes))
-    
-        df['predicao_ia'] = modelo.predict(X)
-    
-        caminho_saida = 'data/resultados_finais_ia.csv'
-        df.to_csv(caminho_saida, index=False)
-        print(f"\n[OK] Mapeamento concluído! Previsões salvas em: {caminho_saida}")
-        print("O projeto está pronto para ser conectado ao Power BI.")
-
-    if __name__ == "__main__":
-        main()
-    }
+# Mostra o mapa na tela
+plt.show()
